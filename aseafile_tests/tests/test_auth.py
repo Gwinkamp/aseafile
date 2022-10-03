@@ -1,7 +1,7 @@
 import pytest
+from http import HTTPStatus
 from config import SETTINGS
 from assertpy import assert_that
-from http import HTTPStatus
 from aseafile import SeafileHttpClient
 from aseafile_tests.test_data.context import TestContext
 
@@ -41,7 +41,7 @@ class TestCreateHttpClientAndPing:
         assert_that(result).is_not_none()
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
-        assert_that(result.status_code).is_equal_to(HTTPStatus.OK)
+        assert_that(result.status).is_equal_to(HTTPStatus.OK)
         assert_that(result.content).is_equal_to('"pong"')
 
 
@@ -81,7 +81,7 @@ class TestSuccessObtainAuthTokenAndPing:
         assert_that(result).is_not_none()
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
-        assert_that(result.status_code).is_equal_to(HTTPStatus.OK)
+        assert_that(result.status).is_equal_to(HTTPStatus.OK)
         assert_that(result.content).is_not_none().is_not_empty()
 
         # Save context
@@ -100,7 +100,7 @@ class TestSuccessObtainAuthTokenAndPing:
         assert_that(result).is_not_none()
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
-        assert_that(result.status_code).is_equal_to(HTTPStatus.OK)
+        assert_that(result.status).is_equal_to(HTTPStatus.OK)
         assert_that(result.content).is_equal_to('"pong"')
 
 
@@ -135,7 +135,7 @@ class TestFailedObtainAuthToken:
         # Assert
         assert_that(result).is_not_none()
         assert_that(result.success).is_false()
-        assert_that(result.status_code).is_equal_to(HTTPStatus.BAD_REQUEST)
+        assert_that(result.status).is_equal_to(HTTPStatus.BAD_REQUEST)
         assert_that(result.content).is_none()
         assert_that(result.errors).is_not_none().is_not_empty()
         assert_that(result.errors).contains_key('non_field_errors')

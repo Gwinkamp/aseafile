@@ -39,12 +39,12 @@ class SeafileHttpClient:
 
                 result = SeaResult[str](
                     success=(http_status == HTTPStatus.OK),
-                    status_code=http_status,
+                    status=http_status,
                     errors=None,
                     content=response_content
                 )
 
-                if result.status_code == HTTPStatus.BAD_REQUEST:
+                if result.status == HTTPStatus.BAD_REQUEST:
                     result.errors = self._try_parse_errors(response_content)
 
                 return result
@@ -61,12 +61,12 @@ class SeafileHttpClient:
 
                 result = SeaResult[str](
                     success=(http_status == HTTPStatus.OK),
-                    status_code=http_status,
+                    status=http_status,
                     errors=None,
                     content=response_content
                 )
 
-                if result.status_code == HTTPStatus.BAD_REQUEST:
+                if result.status == HTTPStatus.BAD_REQUEST:
                     result.errors = self._try_parse_errors(response_content)
 
                 return result
@@ -99,7 +99,7 @@ class SeafileHttpClient:
 
                 return SeaResult[str](
                     success=(http_status == HTTPStatus.OK),
-                    status_code=http_status,
+                    status=http_status,
                     errors=errors,
                     content=token
                 )

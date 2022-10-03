@@ -8,6 +8,6 @@ ContentT = TypeVar('ContentT')
 
 class SeaResult(GenericModel, Generic[ContentT]):
     success: bool
-    status_code: HTTPStatus
+    status: HTTPStatus
     errors: Dict[str, List[str]] | None
     content: ContentT | None
