@@ -140,3 +140,30 @@ class TestFailedObtainAuthToken:
         assert_that(result.errors).is_not_none().is_not_empty()
         assert_that(result.errors).contains_key('non_field_errors')
         assert_that(result.errors['non_field_errors']).contains_only('Unable to login with provided credentials.')
+
+
+@pytest.mark.incremental
+class TestFailedAuthPingWithoutToken:
+
+    def setup_class(self):
+        self.context = TestContext()
+        self.context.add('token', 'failed_token')
+        self.context.add('httpClient', SeafileHttpClient(SETTINGS.base_url))
+
+    @pytest.mark.asyncio
+    async def test_obtain_auth_token(self):
+        # Arrange
+        token = self.context.get('token')
+        http_client = self.context.get('httpClient')
+
+        # Act
+        result = await http_client.auth_ping(token)
+
+        # Assert
+        assert_that(result).is_not_none()
+        assert_that(result.success).is_false()
+        assert_that(result.status).is_equal_to(HTTPStatus.UNAUTHORIZED)
+        assert_that(result.content).is_none()
+        assert_that(result.errors).is_not_none().is_not_empty()
+        assert_that(result.errors).contains_key('detail')
+        assert_that(result.errors['detail']).contains_only('Invalid token')

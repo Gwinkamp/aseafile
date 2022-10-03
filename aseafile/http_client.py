@@ -63,11 +63,19 @@ class SeafileHttpClient:
                     success=(http_status == HTTPStatus.OK),
                     status=http_status,
                     errors=None,
-                    content=response_content
+                    content=None
                 )
 
-                if result.status == HTTPStatus.BAD_REQUEST:
-                    result.errors = self._try_parse_errors(response_content)
+                match http_status:
+                    case HTTPStatus.OK:
+                        result.content = response_content
+                    case HTTPStatus.BAD_REQUEST:
+                        result.errors = self._try_parse_errors(response_content)
+                    case HTTPStatus.UNAUTHORIZED:
+                        result.errors = self._try_parse_global_error(response_content)
+                    case _:
+                        # TODO: добавить логирование
+                        pass
 
                 return result
 
@@ -82,27 +90,25 @@ class SeafileHttpClient:
             async with session.post(url=method_url, data=data) as response:
                 http_status = HTTPStatus(response.status)
 
-                token = ...
-                errors = ...
-                response_content = ...
-
-                if http_status == HTTPStatus.OK:
-                    response_content = await response.json()
-                    token = response_content.get('token')
-                    errors = None
-                elif http_status == HTTPStatus.BAD_REQUEST:
-                    response_content = await response.text()
-                    token = None
-                    errors = self._try_parse_errors(response_content)
-                else:
-                    pass  # TODO: предусмотреть другие кейсы
-
-                return SeaResult[str](
+                result = SeaResult[str](
                     success=(http_status == HTTPStatus.OK),
                     status=http_status,
-                    errors=errors,
-                    content=token
+                    errors=None,
+                    content=None
                 )
+
+                match http_status:
+                    case HTTPStatus.OK:
+                        response_content = await response.json()
+                        result.content = response_content.get('token')
+                    case HTTPStatus.BAD_REQUEST:
+                        response_content = await response.text()
+                        result.errors = self._try_parse_errors(response_content)
+                    case _:
+                        # TODO: добавить логирование
+                        pass
+
+                return result
 
     async def authorize(self, username: str, password: str):
         response = await self.obtain_auth_token(username, password)
@@ -116,6 +122,13 @@ class SeafileHttpClient:
     def _try_parse_errors(self, response_content: str):
         try:
             return parse_raw_as(Dict[str, List[str]], response_content)
+        except Exception as e:
+            return self._try_parse_global_error(response_content)
+
+    def _try_parse_global_error(self, response_content: str):
+        try:
+            error = parse_raw_as(Dict[str, str], response_content)
+            return {'detail': [error['detail']]}
         except Exception as e:
             # TODO: добавить логирование
             print(e)
