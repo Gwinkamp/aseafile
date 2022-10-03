@@ -4,6 +4,7 @@ from typing import Dict, List
 from pydantic import parse_raw_as
 from urllib.parse import urljoin
 from pydantic import HttpUrl
+from .exceptions import UnauthorizedError
 from aseafile.seafile import RouteStorage
 from aseafile.models import SeaResult
 
@@ -25,7 +26,7 @@ class SeafileHttpClient:
         return self._base_url
 
     @property
-    def token(self):
+    def token(self) -> str | None:
         return self._token
 
     async def ping(self):
@@ -44,14 +45,14 @@ class SeafileHttpClient:
                 )
 
                 if result.status_code == HTTPStatus.BAD_REQUEST:
-                    result.errors = self.try_parse_errors(response_content)
+                    result.errors = self._try_parse_errors(response_content)
 
                 return result
 
     async def auth_ping(self, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.auth_ping)
 
-        headers = {'Authorization': f'Token {token or self.token}'}
+        headers = self._create_authorization_headers(token)
 
         async with aiohttp.ClientSession() as session:
             async with session.get(url=method_url, headers=headers) as response:
@@ -66,7 +67,7 @@ class SeafileHttpClient:
                 )
 
                 if result.status_code == HTTPStatus.BAD_REQUEST:
-                    result.errors = self.try_parse_errors(response_content)
+                    result.errors = self._try_parse_errors(response_content)
 
                 return result
 
@@ -92,7 +93,7 @@ class SeafileHttpClient:
                 elif http_status == HTTPStatus.BAD_REQUEST:
                     response_content = await response.text()
                     token = None
-                    errors = self.try_parse_errors(response_content)
+                    errors = self._try_parse_errors(response_content)
                 else:
                     pass  # TODO: предусмотреть другие кейсы
 
@@ -112,9 +113,17 @@ class SeafileHttpClient:
 
         self._token = response.token
 
-    def try_parse_errors(self, response_content: str):
+    def _try_parse_errors(self, response_content: str):
         try:
             return parse_raw_as(Dict[str, List[str]], response_content)
         except Exception as e:
             # TODO: добавить логирование
             print(e)
+
+    def _create_authorization_headers(self, token: str | None):
+        resulting_token = token or self.token
+        if resulting_token is None:
+            # TODO: добавить логирование
+            raise UnauthorizedError()
+
+        return {'Authorization': f'Token {resulting_token}'}
