@@ -167,3 +167,41 @@ class TestFailedAuthPingWithoutToken:
         assert_that(result.errors).is_not_none().is_not_empty()
         assert_that(result.errors).contains_key('detail')
         assert_that(result.errors['detail']).contains_only('Invalid token')
+
+
+@pytest.mark.incremental
+class TestAuthorizeAndAutosaveToken:
+
+    def setup_class(self):
+        self.context = TestContext()
+        self.context.add('email', SETTINGS.email)
+        self.context.add('password', SETTINGS.password)
+        self.context.add('httpClient', SeafileHttpClient(SETTINGS.base_url))
+
+    @pytest.mark.asyncio
+    async def test_authorize(self):
+        # Arrange
+        email = self.context.get('email')
+        password = self.context.get('password')
+        http_client = self.context.get('httpClient')
+
+        # Act
+        await http_client.authorize(email, password)
+
+        # Assert
+        assert_that(http_client.token).is_not_none().is_not_empty()
+
+    @pytest.mark.asyncio
+    async def test_auth_ping(self):
+        # Arrange
+        http_client = self.context.get('httpClient')
+
+        # Act
+        result = await http_client.auth_ping()
+
+        # Assert
+        assert_that(result).is_not_none()
+        assert_that(result.success).is_true()
+        assert_that(result.errors).is_none()
+        assert_that(result.status).is_equal_to(HTTPStatus.OK)
+        assert_that(result.content).is_equal_to('"pong"')

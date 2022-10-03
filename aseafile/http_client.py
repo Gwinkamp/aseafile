@@ -117,7 +117,7 @@ class SeafileHttpClient:
             # TODO: добавить логирование
             raise Exception(f'fail')
 
-        self._token = response.token
+        self._token = response.content
 
     def _try_parse_errors(self, response_content: str):
         try:
