@@ -1,7 +1,9 @@
 from __future__ import annotations
+from typing import Type, TypeVar, Any
 import json
 import codecs
-from typing import Any
+
+T = TypeVar('T')
 
 
 class TestContext:
@@ -13,6 +15,9 @@ class TestContext:
         self._context_data[key] = value
 
     def get(self, key: str) -> Any:
+        return self._context_data.get(key)
+
+    def typed_get(self, key: str, content_type: Type[T]) -> T:
         return self._context_data.get(key)
 
     @staticmethod

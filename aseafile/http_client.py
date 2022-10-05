@@ -1,12 +1,11 @@
 import aiohttp
-from http import HTTPStatus
-from typing import Dict, List
-from pydantic import parse_raw_as
+from typing import Dict, List, Any
 from urllib.parse import urljoin
 from pydantic import HttpUrl
-from .exceptions import UnauthorizedError
-from aseafile.seafile import RouteStorage
-from aseafile.models import SeaResult
+from aseafile.route_storage import RouteStorage
+from aseafile.http_request_handler import HttpRequestHandler
+from aseafile.models import *
+from aseafile.enums import *
 
 
 class SeafileHttpClient:
@@ -32,52 +31,22 @@ class SeafileHttpClient:
     async def ping(self):
         method_url = urljoin(self.base_url, self._route_storage.ping)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url=method_url) as response:
-                response_content = await response.text()
-                http_status = HTTPStatus(response.status)
-
-                result = SeaResult[str](
-                    success=(http_status == HTTPStatus.OK),
-                    status=http_status,
-                    errors=None,
-                    content=response_content
-                )
-
-                if result.status == HTTPStatus.BAD_REQUEST:
-                    result.errors = self._try_parse_errors(response_content)
-
-                return result
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url
+        )
+        return await handler.execute(content_type=str)
 
     async def auth_ping(self, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.auth_ping)
 
-        headers = self._create_authorization_headers(token)
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token
+        )
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url=method_url, headers=headers) as response:
-                response_content = await response.text()
-                http_status = HTTPStatus(response.status)
-
-                result = SeaResult[str](
-                    success=(http_status == HTTPStatus.OK),
-                    status=http_status,
-                    errors=None,
-                    content=None
-                )
-
-                match http_status:
-                    case HTTPStatus.OK:
-                        result.content = response_content
-                    case HTTPStatus.BAD_REQUEST:
-                        result.errors = self._try_parse_errors(response_content)
-                    case HTTPStatus.UNAUTHORIZED:
-                        result.errors = self._try_parse_global_error(response_content)
-                    case _:
-                        # TODO: добавить логирование
-                        pass
-
-                return result
+        return await handler.execute(content_type=str)
 
     async def obtain_auth_token(self, username: str, password: str):
         method_url = urljoin(self.base_url, self._route_storage.auth_token)
@@ -86,57 +55,478 @@ class SeafileHttpClient:
         data.add_field('username', username)
         data.add_field('password', password)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url=method_url, data=data) as response:
-                http_status = HTTPStatus(response.status)
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            data=data
+        )
 
-                result = SeaResult[str](
-                    success=(http_status == HTTPStatus.OK),
-                    status=http_status,
-                    errors=None,
-                    content=None
-                )
-
-                match http_status:
-                    case HTTPStatus.OK:
-                        response_content = await response.json()
-                        result.content = response_content.get('token')
-                    case HTTPStatus.BAD_REQUEST:
-                        response_content = await response.text()
-                        result.errors = self._try_parse_errors(response_content)
-                    case _:
-                        # TODO: добавить логирование
-                        pass
-
-                return result
+        return await handler.execute(content_type=TokenContainer)
 
     async def authorize(self, username: str, password: str):
-        response = await self.obtain_auth_token(username, password)
+        result = await self.obtain_auth_token(username, password)
 
-        if not response.success:
+        if not result.success:
             # TODO: добавить логирование
             raise Exception(f'fail')
 
-        self._token = response.content
+        self._token = result.content.token
 
-    def _try_parse_errors(self, response_content: str):
-        try:
-            return parse_raw_as(Dict[str, List[str]], response_content)
-        except Exception as e:
-            return self._try_parse_global_error(response_content)
+    async def get_default_repo(self, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.default_repo)
 
-    def _try_parse_global_error(self, response_content: str):
-        try:
-            error = parse_raw_as(Dict[str, str], response_content)
-            return {'detail': [error['detail']]}
-        except Exception as e:
-            # TODO: добавить логирование
-            print(e)
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token
+        )
 
-    def _create_authorization_headers(self, token: str | None):
-        resulting_token = token or self.token
-        if resulting_token is None:
-            # TODO: добавить логирование
-            raise UnauthorizedError()
+        response = await handler.execute(content_type=Dict)
+        result = SeaResult[str](
+            success=response.success,
+            status=response.status,
+            errors=response.errors,
+            content=None
+        )
 
-        return {'Authorization': f'Token {resulting_token}'}
+        if not result.success:
+            return result
+
+        result.content = response.content['repo_id']
+        return result
+
+    async def create_default_repo(self, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.default_repo)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token
+        )
+
+        response = await handler.execute(content_type=Dict)  # TODO: определить модель
+        result = SeaResult[str](
+            success=response.success,
+            status=response.status,
+            errors=response.errors,
+            content=None
+        )
+
+        if not result.success:
+            return result
+
+        result.content = response.content['repo_id']
+        return result
+
+    async def get_repos(self, repo_type: RepoType | None = None, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.repos)
+        query_params = None
+
+        if repo_type is not None:
+            query_params = {'type': repo_type}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[RepoItem])
+
+    async def create_repo(self, repo_name: str, token: str | None = None) -> SeaResult[RepoItem]:
+        method_url = urljoin(self.base_url, self._route_storage.repos)
+
+        data = aiohttp.FormData()
+        data.add_field('name', repo_name)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            data=data
+        )
+
+        response = await handler.execute(content_type=Dict)
+        result = SeaResult[RepoItem](
+            success=response.success,
+            status=response.status,
+            errors=response.errors,
+            content=None
+        )
+
+        if not result.success:
+            return result
+
+        result.content = RepoItem(
+            id=response.content['repo_id'],
+            type=ItemType.REPO,
+            name=response.content['repo_name'],
+            mtime=response.content['mtime'],
+            permission=response.content['permission'],
+            size=response.content['repo_size'],
+            owner=response.content['email']
+        )
+
+        return result
+
+    async def delete_repo(self, repo_id: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.repo(repo_id))
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.DELETE,
+            url=method_url,
+            token=token or self.token
+        )
+
+        return await handler.execute()
+
+    async def get_download_link(self, repo_id: str, filepath: str, reuse: bool = False, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+        query_params = {'p': filepath}
+
+        if reuse:
+            query_params['reuse'] = 1
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=str)
+
+    async def get_file_detail(self, repo_id: str, filepath: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file_detail(repo_id))
+        query_params = {'p': filepath}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=FileItemDetail)
+
+    async def create_file(self, repo_id: str, filepath: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+        query_params = {'p': filepath}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', FileOperation.CREATE)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        return await handler.execute()
+
+    async def rename_file(self, repo_id: str, filepath: str, new_filename: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+        query_params = {'p': filepath}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', FileOperation.RENAME)
+        data.add_field('newname', new_filename)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        return await handler.execute()
+
+    async def move_file(
+            self,
+            repo_id: str,
+            filepath: str,
+            dst_dir: str,
+            token: str | None = None,
+            dst_repo_id: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+        query_params = {'p': filepath}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', FileOperation.MOVE)
+        data.add_field('dst_dir', dst_dir)
+        data.add_field('dst_repo', dst_repo_id or repo_id)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        return await handler.execute(content_type=str)
+
+    async def copy_file(
+            self,
+            repo_id: str,
+            filepath: str,
+            dst_dir: str,
+            token: str | None = None,
+            dst_repo_id: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+        query_params = {'p': filepath}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', FileOperation.COPY)
+        data.add_field('dst_dir', dst_dir)
+        data.add_field('dst_repo', dst_repo_id or repo_id)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        return await handler.execute()
+
+    async def delete_file(self, repo_id: str, filepath: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+        query_params = {'p': filepath}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', FileOperation.DELETE)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.DELETE,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        return await handler.execute()
+
+    async def lock_file(self, repo_id: str, filepath: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+
+        data = aiohttp.FormData()
+        data.add_field('p', filepath)
+        data.add_field('operation', FileOperation.LOCK)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.PUT,
+            url=method_url,
+            token=token or self.token,
+            data=data
+        )
+
+        return await handler.execute()
+
+    async def unlock_file(self, repo_id: str, filepath: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
+
+        data = aiohttp.FormData()
+        data.add_field('p', filepath)
+        data.add_field('operation', FileOperation.UNLOCK)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.PUT,
+            url=method_url,
+            token=token or self.token,
+            data=data
+        )
+
+        return await handler.execute()
+
+    async def get_items(self, repo_id: str, path: str | None = None, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {'p': path or '/'}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[BaseItem])
+
+    async def get_items_by_id(self, repo_id: str, dir_id: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {'oid': dir_id}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[BaseItem])
+
+    async def get_files(self, repo_id: str, path: str | None = None, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {
+            'p': path or '/',
+            't': 'f'
+        }
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[FileItem])
+
+    async def get_files_by_id(self, repo_id: str, dir_id: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {
+            'oid': dir_id,
+            't': 'f'
+        }
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[FileItem])
+
+    async def get_directories(
+            self,
+            repo_id: str,
+            path: str | None = None,
+            recursive: bool = False,
+            token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {
+            'p': path or '/',
+            't': 'd'
+        }
+
+        if recursive:
+            query_params['recursive'] = 1
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[DirectoryItem])
+
+    async def get_directories_by_id(
+            self,
+            repo_id: str,
+            dir_id: str,
+            recursive: bool = False,
+            token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {
+            'oid': dir_id,
+            't': 'd'
+        }
+
+        if recursive:
+            query_params['recursive'] = 1
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=List[DirectoryItem])
+
+    async def get_directory_detail(self, repo_id: str, path: str, token: str | None = None):
+        if path == '/':
+            raise ValueError('Path should not be "/"')
+
+        method_url = urljoin(self.base_url, self._route_storage.dir_detail(repo_id))
+        query_params = {'path': path}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=DirectoryItemDetail)
+
+    async def create_directory(self, repo_id: str, path: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {'p': path}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', DirectoryOperation.CREATE)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            data=data,
+            query_params=query_params
+        )
+
+        return await handler.execute()
+
+    async def rename_directory(self, repo_id: str, path: str, new_name: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {'p': path}
+
+        data = aiohttp.FormData()
+        data.add_field('operation', DirectoryOperation.RENAME)
+        data.add_field('newname', new_name)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=method_url,
+            token=token or self.token,
+            data=data,
+            query_params=query_params
+        )
+
+        return await handler.execute()
+
+    async def delete_directory(self, repo_id: str, path: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
+        query_params = {'p': path}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.DELETE,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute()
+
+    async def get_smart_link(self, repo_id: str, path: str, is_dir: bool = False, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.smart_link)
+        query_params = {
+            'repo_id': repo_id,
+            'path': path,
+            'is_dir': str(is_dir).lower()
+        }
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=SmartLink)

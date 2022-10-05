@@ -1,8 +1,10 @@
 import pytest
 from http import HTTPStatus
-from config import SETTINGS
+from pydantic import HttpUrl
 from assertpy import assert_that
 from aseafile import SeafileHttpClient
+from aseafile.models import TokenContainer
+from aseafile_tests.config import SETTINGS
 from aseafile_tests.test_data.context import TestContext
 
 # Scenarios
@@ -18,7 +20,7 @@ class TestCreateHttpClientAndPing:
 
     def test_create_instance(self):
         # Arrange
-        base_url = self.context.get('baseUrl')
+        base_url = self.context.typed_get('baseUrl', HttpUrl)
 
         # Act
         http_client = SeafileHttpClient(base_url)
@@ -32,7 +34,7 @@ class TestCreateHttpClientAndPing:
     @pytest.mark.asyncio
     async def test_ping(self):
         # Arrange
-        http_client = self.context.get('httpClient')
+        http_client = self.context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         result = await http_client.ping()
@@ -42,7 +44,7 @@ class TestCreateHttpClientAndPing:
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
-        assert_that(result.content).is_equal_to('"pong"')
+        assert_that(result.content).is_equal_to('pong')
 
 
 @pytest.mark.incremental
@@ -56,7 +58,7 @@ class TestSuccessObtainAuthTokenAndPing:
 
     def test_create_instance(self):
         # Arrange
-        base_url = self.context.get('baseUrl')
+        base_url = self.context.typed_get('baseUrl', HttpUrl)
 
         # Act
         http_client = SeafileHttpClient(base_url)
@@ -70,9 +72,9 @@ class TestSuccessObtainAuthTokenAndPing:
     @pytest.mark.asyncio
     async def test_obtain_auth_token(self):
         # Arrange
-        email = self.context.get('email')
-        password = self.context.get('password')
-        http_client = self.context.get('httpClient')
+        email = self.context.typed_get('email', str)
+        password = self.context.typed_get('password', str)
+        http_client = self.context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         result = await http_client.obtain_auth_token(email, password)
@@ -82,16 +84,16 @@ class TestSuccessObtainAuthTokenAndPing:
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
-        assert_that(result.content).is_not_none().is_not_empty()
+        assert_that(result.content).is_instance_of(TokenContainer)
 
         # Save context
-        self.context.add('token', result.content)
+        self.context.add('token', result.content.token)
 
     @pytest.mark.asyncio
     async def test_auth_ping(self):
         # Arrange
-        token = self.context.get('token')
-        http_client = self.context.get('httpClient')
+        token = self.context.typed_get('token', str)
+        http_client = self.context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         result = await http_client.auth_ping(token)
@@ -101,12 +103,11 @@ class TestSuccessObtainAuthTokenAndPing:
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
-        assert_that(result.content).is_equal_to('"pong"')
+        assert_that(result.content).is_equal_to('pong')
 
 
 @pytest.mark.incremental
 class TestFailedObtainAuthToken:
-
     SCENARIOS = FAILED_OBTAIN_AUTH_TOKEN_SCENARIOS
 
     def setup_class(self):
@@ -125,9 +126,9 @@ class TestFailedObtainAuthToken:
     @pytest.mark.asyncio
     async def test_obtain_auth_token(self, context: TestContext):
         # Arrange
-        email = context.get('email')
-        password = context.get('password')
-        http_client = context.get('httpClient')
+        email = context.typed_get('email', str)
+        password = context.typed_get('password', str)
+        http_client = context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         result = await http_client.obtain_auth_token(email, password)
@@ -153,8 +154,8 @@ class TestFailedAuthPingWithoutToken:
     @pytest.mark.asyncio
     async def test_obtain_auth_token(self):
         # Arrange
-        token = self.context.get('token')
-        http_client = self.context.get('httpClient')
+        token = self.context.typed_get('token', str)
+        http_client = self.context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         result = await http_client.auth_ping(token)
@@ -181,9 +182,9 @@ class TestAuthorizeAndAutosaveToken:
     @pytest.mark.asyncio
     async def test_authorize(self):
         # Arrange
-        email = self.context.get('email')
-        password = self.context.get('password')
-        http_client = self.context.get('httpClient')
+        email = self.context.typed_get('email', str)
+        password = self.context.typed_get('password', str)
+        http_client = self.context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         await http_client.authorize(email, password)
@@ -194,7 +195,7 @@ class TestAuthorizeAndAutosaveToken:
     @pytest.mark.asyncio
     async def test_auth_ping(self):
         # Arrange
-        http_client = self.context.get('httpClient')
+        http_client = self.context.typed_get('httpClient', SeafileHttpClient)
 
         # Act
         result = await http_client.auth_ping()
@@ -204,4 +205,4 @@ class TestAuthorizeAndAutosaveToken:
         assert_that(result.success).is_true()
         assert_that(result.errors).is_none()
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
-        assert_that(result.content).is_equal_to('"pong"')
+        assert_that(result.content).is_equal_to('pong')
