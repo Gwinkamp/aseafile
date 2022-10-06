@@ -1,7 +1,9 @@
 import aiohttp
+import aiologger
 from typing import Dict, List, BinaryIO
 from urllib.parse import urljoin
 from pydantic import HttpUrl
+from aseafile.logging import LoggerFactory
 from aseafile.route_storage import RouteStorage
 from aseafile.http_request_handler import HttpRequestHandler
 from aseafile.models import *
@@ -10,11 +12,12 @@ from aseafile.enums import *
 
 class SeafileHttpClient:
 
-    def __init__(self, base_url: HttpUrl):
+    def __init__(self, base_url: HttpUrl, logger: aiologger.Logger | None = None):
         self._version = 'v2.1'
         self._token = None
         self._base_url = base_url
         self._route_storage = RouteStorage()
+        self._logger = logger or LoggerFactory.create_default_logger(__name__)
 
     @property
     def version(self):
@@ -67,8 +70,9 @@ class SeafileHttpClient:
         result = await self.obtain_auth_token(username, password)
 
         if not result.success:
-            # TODO: добавить логирование
-            raise Exception(f'fail')
+            message = 'Error when obtain the token: ' + ', '.join(e.message for e in result.errors)
+            await self._logger.critical(message)
+            raise Exception(message)
 
         self._token = result.content.token
 
@@ -104,7 +108,7 @@ class SeafileHttpClient:
             token=token or self.token
         )
 
-        response = await handler.execute(content_type=Dict)  # TODO: определить модель
+        response = await handler.execute(content_type=Dict)
         result = SeaResult[str](
             success=response.success,
             status=response.status,

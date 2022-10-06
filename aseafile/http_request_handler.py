@@ -1,8 +1,9 @@
 import aiohttp
 from http import HTTPStatus
 from pydantic import parse_raw_as
-from typing import Type, TypeVar, Dict, List, Any
+from typing import Type, TypeVar, Dict, Any
 from aseafile.enums import HttpMethod
+from aseafile.logging import LoggerFactory
 from aseafile.exceptions import UnauthorizedError
 from aseafile.models import SeaResult, Error
 
@@ -37,6 +38,7 @@ class HttpRequestHandler:
         self._token = token
         self._query_params = query_params
         self._headers = dict()
+        self._logger = LoggerFactory.create_default_logger(__name__)
         if token is not None:
             self._headers |= self._create_authorization_headers(token)
         if headers is not None:
@@ -72,8 +74,7 @@ class HttpRequestHandler:
 
                 return result
 
-    @classmethod
-    def _try_parse_errors(cls, response_content: str | bytes):
+    def _try_parse_errors(self, response_content: str | bytes):
         try:
             errors = parse_raw_as(Dict[str, Any], response_content)
             result = list()
@@ -83,16 +84,15 @@ class HttpRequestHandler:
                 elif isinstance(value, str):
                     result.append(Error(title=key, message=value))
                 else:
-                    pass  # TODO: добавить логирование
+                    self._logger.error('Unexpected type of error')
 
             return result
         except Exception:
-            pass  # TODO: добавить логирование
+            self._logger.error('Failed to parse the error message')
 
-    @staticmethod
-    def _create_authorization_headers(token: str | None):
+    def _create_authorization_headers(self, token: str | None):
         if token is None:
-            # TODO: добавить логирование
+            self._logger.critical('Undefined token')
             raise UnauthorizedError()
 
         return {'Authorization': f'Token {token}'}
