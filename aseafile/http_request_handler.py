@@ -4,7 +4,7 @@ from pydantic import parse_raw_as
 from typing import Type, TypeVar, Dict, List, Any
 from aseafile.enums import HttpMethod
 from aseafile.exceptions import UnauthorizedError
-from aseafile.models import SeaResult
+from aseafile.models import SeaResult, Error
 
 T = TypeVar('T')
 
@@ -75,18 +75,19 @@ class HttpRequestHandler:
     @classmethod
     def _try_parse_errors(cls, response_content: str | bytes):
         try:
-            return parse_raw_as(Dict[str, List[str]], response_content)
-        except Exception:
-            return cls._try_parse_error(response_content)
+            errors = parse_raw_as(Dict[str, Any], response_content)
+            result = list()
+            for key, value in errors.items():
+                if isinstance(value, list):
+                    result.append(Error(title=key, message='; '.join(value)))
+                elif isinstance(value, str):
+                    result.append(Error(title=key, message=value))
+                else:
+                    pass  # TODO: добавить логирование
 
-    @staticmethod
-    def _try_parse_error(response_content: str | bytes):
-        try:
-            error = parse_raw_as(Dict[str, str], response_content)
-            return {'detail': [error['detail']]}
-        except Exception as e:
-            # TODO: добавить логирование
-            print(e)
+            return result
+        except Exception:
+            pass  # TODO: добавить логирование
 
     @staticmethod
     def _create_authorization_headers(token: str | None):

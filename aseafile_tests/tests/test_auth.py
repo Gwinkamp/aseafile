@@ -107,6 +107,7 @@ class TestSuccessObtainAuthTokenAndPing:
 
 
 @pytest.mark.incremental
+@pytest.mark.usefixtures("use_custom_assertions")
 class TestFailedObtainAuthToken:
     SCENARIOS = FAILED_OBTAIN_AUTH_TOKEN_SCENARIOS
 
@@ -139,11 +140,11 @@ class TestFailedObtainAuthToken:
         assert_that(result.status).is_equal_to(HTTPStatus.BAD_REQUEST)
         assert_that(result.content).is_none()
         assert_that(result.errors).is_not_none().is_not_empty()
-        assert_that(result.errors).contains_key('non_field_errors')
-        assert_that(result.errors['non_field_errors']).contains_only('Unable to login with provided credentials.')
+        assert_that(result.errors).contains_item(lambda e: e.message == 'Unable to login with provided credentials.')
 
 
 @pytest.mark.incremental
+@pytest.mark.usefixtures("use_custom_assertions")
 class TestFailedAuthPingWithoutToken:
 
     def setup_class(self):
@@ -166,8 +167,7 @@ class TestFailedAuthPingWithoutToken:
         assert_that(result.status).is_equal_to(HTTPStatus.UNAUTHORIZED)
         assert_that(result.content).is_none()
         assert_that(result.errors).is_not_none().is_not_empty()
-        assert_that(result.errors).contains_key('detail')
-        assert_that(result.errors['detail']).contains_only('Invalid token')
+        assert_that(result.errors).contains_item(lambda e: e.message == 'Invalid token')
 
 
 @pytest.mark.incremental

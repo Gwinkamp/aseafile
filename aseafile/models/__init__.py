@@ -9,3 +9,4 @@ from .repo_item import RepoItem
 from .dir_item_detail import DirectoryItemDetail
 from .uploaded_file_item import UploadedFileItem
 from .upload_file import UploadFile
+from .error import Error
