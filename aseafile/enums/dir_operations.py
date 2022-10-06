@@ -1,4 +1,4 @@
-from strenum import StrEnum
+from .base import StrEnum
 
 
 class DirectoryOperation(StrEnum):

@@ -1,23 +1,20 @@
 import aiohttp
-import aiologger
-from typing import Dict, List, BinaryIO
+from typing import Dict, List, BinaryIO, Any
 from urllib.parse import urljoin
 from pydantic import HttpUrl
-from aseafile.logging import LoggerFactory
 from aseafile.route_storage import RouteStorage
-from aseafile.http_request_handler import HttpRequestHandler
+from aseafile.http_handlers import HttpRequestHandler, HttpDownloadHandler
 from aseafile.models import *
 from aseafile.enums import *
 
 
 class SeafileHttpClient:
 
-    def __init__(self, base_url: HttpUrl, logger: aiologger.Logger | None = None):
+    def __init__(self, base_url: HttpUrl):
         self._version = 'v2.1'
         self._token = None
         self._base_url = base_url
         self._route_storage = RouteStorage()
-        self._logger = logger or LoggerFactory.create_default_logger(__name__)
 
     @property
     def version(self):
@@ -70,9 +67,7 @@ class SeafileHttpClient:
         result = await self.obtain_auth_token(username, password)
 
         if not result.success:
-            message = 'Error when obtain the token: ' + ', '.join(e.message for e in result.errors)
-            await self._logger.critical(message)
-            raise Exception(message)
+            raise Exception('Error when obtain the token: ' + ', '.join(e.message for e in result.errors))
 
         self._token = result.content.token
 
@@ -85,7 +80,7 @@ class SeafileHttpClient:
             token=token or self.token
         )
 
-        response = await handler.execute(content_type=Dict)
+        response = await handler.execute(content_type=Dict[str, Any])
         result = SeaResult[str](
             success=response.success,
             status=response.status,
@@ -96,7 +91,8 @@ class SeafileHttpClient:
         if not result.success:
             return result
 
-        result.content = response.content['repo_id']
+        if response.content:
+            result.content = response.content['repo_id']
         return result
 
     async def create_default_repo(self, token: str | None = None):
@@ -108,7 +104,7 @@ class SeafileHttpClient:
             token=token or self.token
         )
 
-        response = await handler.execute(content_type=Dict)
+        response = await handler.execute(content_type=Dict[str, Any])
         result = SeaResult[str](
             success=response.success,
             status=response.status,
@@ -119,12 +115,14 @@ class SeafileHttpClient:
         if not result.success:
             return result
 
-        result.content = response.content['repo_id']
+        if response.content:
+            result.content = response.content['repo_id']
+
         return result
 
     async def get_repos(self, repo_t: RepoType | None = None, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.repos)
-        query_params = None
+        query_params: Dict[str, str | int] | None = None
 
         if repo_t is not None:
             query_params = {'type': repo_t}
@@ -151,7 +149,7 @@ class SeafileHttpClient:
             data=data
         )
 
-        response = await handler.execute(content_type=Dict)
+        response = await handler.execute(content_type=Dict[str, Any])
         result = SeaResult[RepoItem](
             success=response.success,
             status=response.status,
@@ -162,15 +160,16 @@ class SeafileHttpClient:
         if not result.success:
             return result
 
-        result.content = RepoItem(
-            id=response.content['repo_id'],
-            type=ItemType.REPO,
-            name=response.content['repo_name'],
-            mtime=response.content['mtime'],
-            permission=response.content['permission'],
-            size=response.content['repo_size'],
-            owner=response.content['email']
-        )
+        if response.content:
+            result.content = RepoItem(
+                id=response.content['repo_id'],
+                type=ItemType.REPO,
+                name=response.content['repo_name'],
+                mtime=response.content['mtime'],
+                permission=response.content['permission'],
+                size=response.content['repo_size'],
+                owner=response.content['email']
+            )
 
         return result
 
@@ -187,7 +186,7 @@ class SeafileHttpClient:
 
     async def get_upload_link(self, repo_id: str, dir_path: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.get_upload_link(repo_id))
-        query_params = {'p': dir_path}
+        query_params: Dict[str, str | int] = {'p': dir_path}
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
@@ -218,7 +217,7 @@ class SeafileHttpClient:
                 content=None
             )
 
-        query_params = {'ret-json': 1}
+        query_params: Dict[str, str | int] = {'ret-json': 1}
 
         data = aiohttp.FormData()
         data.add_field('file', payload, filename=filename)
@@ -244,7 +243,7 @@ class SeafileHttpClient:
             content=None
         )
 
-        if result.success:
+        if result.success and upload_response.content is not None:
             result.content = upload_response.content.pop()
 
         return result
@@ -267,7 +266,7 @@ class SeafileHttpClient:
                 content=[]
             )
 
-        query_params = {'ret-json': 1}
+        query_params: Dict[str, str | int] = {'ret-json': 1}
 
         data = aiohttp.FormData()
         data.add_field('parent_dir', dir_path)
@@ -290,7 +289,7 @@ class SeafileHttpClient:
 
     async def get_download_link(self, repo_id: str, filepath: str, reuse: bool = False, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         if reuse:
             query_params['reuse'] = 1
@@ -315,16 +314,16 @@ class SeafileHttpClient:
                 content=None
             )
 
-        handdler = HttpRequestHandler(
+        handdler = HttpDownloadHandler(
             method=HttpMethod.GET,
             url=response.content
         )
 
-        return await handdler.execute(content_type=bytes)
+        return await handdler.execute()
 
     async def get_file_detail(self, repo_id: str, filepath: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file_detail(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
@@ -337,7 +336,7 @@ class SeafileHttpClient:
 
     async def create_file(self, repo_id: str, filepath: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.CREATE)
@@ -354,7 +353,7 @@ class SeafileHttpClient:
 
     async def rename_file(self, repo_id: str, filepath: str, new_filename: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.RENAME)
@@ -378,7 +377,7 @@ class SeafileHttpClient:
             token: str | None = None,
             dst_repo_id: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.MOVE)
@@ -403,7 +402,7 @@ class SeafileHttpClient:
             token: str | None = None,
             dst_repo_id: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.COPY)
@@ -422,7 +421,7 @@ class SeafileHttpClient:
 
     async def delete_file(self, repo_id: str, filepath: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params = {'p': filepath}
+        query_params: Dict[str, str | int] = {'p': filepath}
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.DELETE)
@@ -471,7 +470,7 @@ class SeafileHttpClient:
 
     async def get_items(self, repo_id: str, path: str | None = None, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {'p': path or '/'}
+        query_params: Dict[str, str | int] = {'p': path or '/'}
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
@@ -484,7 +483,7 @@ class SeafileHttpClient:
 
     async def get_items_by_id(self, repo_id: str, dir_id: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {'oid': dir_id}
+        query_params: Dict[str, str | int] = {'oid': dir_id}
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
@@ -497,7 +496,7 @@ class SeafileHttpClient:
 
     async def get_files(self, repo_id: str, path: str | None = None, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {
+        query_params: Dict[str, str | int] = {
             'p': path or '/',
             't': 'f'
         }
@@ -513,7 +512,7 @@ class SeafileHttpClient:
 
     async def get_files_by_id(self, repo_id: str, dir_id: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {
+        query_params: Dict[str, str | int] = {
             'oid': dir_id,
             't': 'f'
         }
@@ -534,7 +533,7 @@ class SeafileHttpClient:
             recursive: bool = False,
             token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {
+        query_params: Dict[str, str | int] = {
             'p': path or '/',
             't': 'd'
         }
@@ -558,7 +557,7 @@ class SeafileHttpClient:
             recursive: bool = False,
             token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {
+        query_params: Dict[str, str | int] = {
             'oid': dir_id,
             't': 'd'
         }
@@ -580,7 +579,7 @@ class SeafileHttpClient:
             raise ValueError('Path should not be "/"')
 
         method_url = urljoin(self.base_url, self._route_storage.dir_detail(repo_id))
-        query_params = {'path': path}
+        query_params: Dict[str, str | int] = {'path': path}
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
@@ -593,7 +592,7 @@ class SeafileHttpClient:
 
     async def create_directory(self, repo_id: str, path: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {'p': path}
+        query_params: Dict[str, str | int] = {'p': path}
 
         data = aiohttp.FormData()
         data.add_field('operation', DirectoryOperation.CREATE)
@@ -610,7 +609,7 @@ class SeafileHttpClient:
 
     async def rename_directory(self, repo_id: str, path: str, new_name: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {'p': path}
+        query_params: Dict[str, str | int] = {'p': path}
 
         data = aiohttp.FormData()
         data.add_field('operation', DirectoryOperation.RENAME)
@@ -628,7 +627,7 @@ class SeafileHttpClient:
 
     async def delete_directory(self, repo_id: str, path: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params = {'p': path}
+        query_params: Dict[str, str | int] = {'p': path}
 
         handler = HttpRequestHandler(
             method=HttpMethod.DELETE,
@@ -641,7 +640,7 @@ class SeafileHttpClient:
 
     async def get_smart_link(self, repo_id: str, path: str, is_dir: bool = False, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.smart_link)
-        query_params = {
+        query_params: Dict[str, str | int] = {
             'repo_id': repo_id,
             'path': path,
             'is_dir': str(is_dir).lower()

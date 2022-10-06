@@ -11,3 +11,6 @@ class SeaResult(GenericModel, Generic[ContentT]):
     status: HTTPStatus
     errors: List[Error] | None
     content: ContentT | None
+
+    class Config:
+        arbitrary_types_allowed = True

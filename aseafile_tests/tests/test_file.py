@@ -1,4 +1,5 @@
 import pytest
+import aiohttp
 import aiofiles
 from typing import List
 from http import HTTPStatus
