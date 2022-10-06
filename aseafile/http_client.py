@@ -1,5 +1,5 @@
 import aiohttp
-from typing import Dict, List, Any
+from typing import Dict, List, BinaryIO
 from urllib.parse import urljoin
 from pydantic import HttpUrl
 from aseafile.route_storage import RouteStorage
@@ -118,12 +118,12 @@ class SeafileHttpClient:
         result.content = response.content['repo_id']
         return result
 
-    async def get_repos(self, repo_type: RepoType | None = None, token: str | None = None):
+    async def get_repos(self, repo_t: RepoType | None = None, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.repos)
         query_params = None
 
-        if repo_type is not None:
-            query_params = {'type': repo_type}
+        if repo_t is not None:
+            query_params = {'type': repo_t}
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
@@ -181,6 +181,109 @@ class SeafileHttpClient:
 
         return await handler.execute()
 
+    async def get_upload_link(self, repo_id: str, dir_path: str, token: str | None = None):
+        method_url = urljoin(self.base_url, self._route_storage.get_upload_link(repo_id))
+        query_params = {'p': dir_path}
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params
+        )
+
+        return await handler.execute(content_type=str)
+
+    async def upload(
+            self,
+            repo_id: str,
+            dir_path: str,
+            filename: str,
+            payload: BinaryIO,
+            replace: bool = False,
+            relative_path: str | None = None,
+            token: str | None = None
+    ):
+        upload_ilnk_response = await self.get_upload_link(repo_id, dir_path)
+
+        if not upload_ilnk_response.success:
+            SeaResult[UploadedFileItem](
+                success=upload_ilnk_response.success,
+                status=upload_ilnk_response.status,
+                errors=upload_ilnk_response.errors,
+                content=None
+            )
+
+        query_params = {'ret-json': 1}
+
+        data = aiohttp.FormData()
+        data.add_field('file', payload, filename=filename)
+        data.add_field('parent_dir', dir_path)
+        data.add_field('replace', str(int(replace)))
+
+        if relative_path is not None:
+            data.add_field('relative_path', relative_path)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=upload_ilnk_response.content,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        upload_response = await handler.execute(content_type=List[UploadedFileItem])
+        result = SeaResult[UploadedFileItem](
+            success=upload_response.success,
+            status=upload_response.status,
+            errors=upload_response.errors,
+            content=None
+        )
+
+        if result.success:
+            result.content = upload_response.content.pop()
+
+        return result
+
+    async def uploads(
+            self,
+            repo_id: str,
+            dir_path: str,
+            files: List[UploadFile],
+            replace: bool = False,
+            relative_path: str | None = None,
+            token: str | None = None):
+        upload_ilnk_response = await self.get_upload_link(repo_id, dir_path)
+
+        if not upload_ilnk_response.success:
+            SeaResult[List[UploadedFileItem]](
+                success=upload_ilnk_response.success,
+                status=upload_ilnk_response.status,
+                errors=upload_ilnk_response.errors,
+                content=[]
+            )
+
+        query_params = {'ret-json': 1}
+
+        data = aiohttp.FormData()
+        data.add_field('parent_dir', dir_path)
+        data.add_field('replace', str(int(replace)))
+        for file in files:
+            data.add_field('file', file['payload'], filename=file['filename'])
+
+        if relative_path is not None:
+            data.add_field('relative_path', relative_path)
+
+        handler = HttpRequestHandler(
+            method=HttpMethod.POST,
+            url=upload_ilnk_response.content,
+            token=token or self.token,
+            query_params=query_params,
+            data=data
+        )
+
+        return await handler.execute(content_type=List[UploadedFileItem])
+
     async def get_download_link(self, repo_id: str, filepath: str, reuse: bool = False, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
         query_params = {'p': filepath}
@@ -196,6 +299,24 @@ class SeafileHttpClient:
         )
 
         return await handler.execute(content_type=str)
+
+    async def download(self, repo_id, filepath: str, token: str | None = None):
+        response = await self.get_download_link(repo_id, filepath, token=token)
+
+        if not response.success:
+            return SeaResult[bytes](
+                success=response.success,
+                status=response.status,
+                errors=response.errors,
+                content=None
+            )
+
+        handdler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=response.content
+        )
+
+        return await handdler.execute(content_type=bytes)
 
     async def get_file_detail(self, repo_id: str, filepath: str, token: str | None = None):
         method_url = urljoin(self.base_url, self._route_storage.file_detail(repo_id))

@@ -51,7 +51,7 @@ class HttpRequestHandler:
                     params=self._query_params,
                     data=self._data
             ) as response:
-                response_content = await response.text()
+                response_content = await response.read()
                 http_status = HTTPStatus(response.status)
 
                 result = SeaResult[T](
@@ -63,21 +63,24 @@ class HttpRequestHandler:
 
                 if result.success:
                     if content_type is not None:
-                        result.content = parse_raw_as(content_type, response_content)
+                        if content_type is bytes:
+                            result.content = response_content
+                        else:
+                            result.content = parse_raw_as(content_type, response_content)
                 else:
                     result.errors = self._try_parse_errors(response_content)
 
                 return result
 
     @classmethod
-    def _try_parse_errors(cls, response_content: str):
+    def _try_parse_errors(cls, response_content: str | bytes):
         try:
             return parse_raw_as(Dict[str, List[str]], response_content)
         except Exception:
             return cls._try_parse_error(response_content)
 
     @staticmethod
-    def _try_parse_error(response_content: str):
+    def _try_parse_error(response_content: str | bytes):
         try:
             error = parse_raw_as(Dict[str, str], response_content)
             return {'detail': [error['detail']]}

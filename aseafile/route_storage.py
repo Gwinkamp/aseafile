@@ -9,6 +9,7 @@ class RouteStorage:
     DIR_ROUTE = 'repos/{repo_id}/dir/'
     FILE_ROUTE = 'repos/{repo_id}/file/'
     SMART_LINK_ROUTE = 'smart-link/'
+    GET_UPLOAD_LINK_ROUTE = 'repos/{repo_id}/upload-link/'
 
     def __init__(self, version: str = 'v2.1', suffix: str | None = None):
         self._version = version
@@ -52,3 +53,6 @@ class RouteStorage:
 
     def dir_detail(self, repo_id: str):
         return 'api/' + self._version + '/' + self.DIR_ROUTE.format(repo_id=repo_id) + 'detail/'
+
+    def get_upload_link(self, repo_id: str):
+        return self._suffix + self.GET_UPLOAD_LINK_ROUTE.format(repo_id=repo_id)
