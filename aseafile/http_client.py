@@ -67,7 +67,9 @@ class SeafileHttpClient:
         result = await self.obtain_auth_token(username, password)
 
         if not result.success:
-            raise Exception('Error when obtain the token: ' + ', '.join(e.message for e in result.errors))
+            raise Exception(
+                'Error when obtain the token: ' + ', '.join(
+                    e.message for e in result.errors or [Error(title='unknown', message='unknown error')]))
 
         self._token = result.content.token
 
