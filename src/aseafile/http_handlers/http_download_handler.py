@@ -1,15 +1,12 @@
 import aiohttp
 from http import HTTPStatus
-from pydantic import parse_raw_as
-from typing import Type, TypeVar, Dict, Any
+from typing import Dict, Any
 from .base_http_handler import BaseHttpHandler
-from aseafile.enums import HttpMethod
-from aseafile.models import SeaResult
-
-T = TypeVar('T')
+from ..enums import HttpMethod
+from ..models import SeaResult
 
 
-class HttpRequestHandler(BaseHttpHandler):
+class HttpDownloadHandler(BaseHttpHandler):
 
     def __init__(
             self,
@@ -21,7 +18,7 @@ class HttpRequestHandler(BaseHttpHandler):
             data: Any | None = None):
         super().__init__(method, url, token, headers, query_params, data)
 
-    async def execute(self, content_type: Type[T] | None = None) -> SeaResult[T]:
+    async def execute(self) -> SeaResult[bytes]:
         async with aiohttp.ClientSession() as session:
             async with session.request(
                     method=self._method,
@@ -33,7 +30,7 @@ class HttpRequestHandler(BaseHttpHandler):
                 response_content = await response.content.read()
                 http_status = HTTPStatus(response.status)
 
-                result = SeaResult[T](
+                result = SeaResult[bytes](
                     success=(http_status in self.SUCCESS_STATUSES),
                     status=http_status,
                     errors=None,
@@ -41,8 +38,7 @@ class HttpRequestHandler(BaseHttpHandler):
                 )
 
                 if result.success:
-                    if content_type is not None:
-                        result.content = parse_raw_as(content_type, response_content)
+                    result.content = response_content
                 else:
                     result.errors = self._try_parse_errors(response_content)
 

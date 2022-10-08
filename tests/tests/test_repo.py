@@ -1,8 +1,8 @@
 import pytest
 from http import HTTPStatus
 from assertpy import assert_that
-from aseafile.models import RepoItem
-from aseafile_tests.test_data.context import TestContext
+from src.aseafile.models import RepoItem
+from tests.test_data.context import TestContext
 
 
 @pytest.mark.incremental

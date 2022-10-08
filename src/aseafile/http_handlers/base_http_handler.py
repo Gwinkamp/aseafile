@@ -1,10 +1,10 @@
 from http import HTTPStatus
 from typing import Dict, Any
 from pydantic import parse_raw_as
-from aseafile.enums import HttpMethod
+from ..enums import HttpMethod
 from abc import ABCMeta, abstractmethod
-from aseafile.exceptions import UnauthorizedError
-from aseafile.models import SeaResult, Error
+from ..exceptions import UnauthorizedError
+from ..models import SeaResult, Error
 
 
 class BaseHttpHandler(metaclass=ABCMeta):

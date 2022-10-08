@@ -4,6 +4,12 @@ Asynchronous [seafile](https://www.seafile.com/en/home/)
 
 Unofficial library that provides the API methods of the seafile service
 
+## Installation
+
+```commandline
+pip install aseafile --upgrade
+```
+
 ## Features
 
 This library is asynchronous

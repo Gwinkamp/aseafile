@@ -1,13 +1,12 @@
 import pytest
-import aiohttp
 import aiofiles
 from typing import List
 from http import HTTPStatus
 from pathlib import PurePath
 from assertpy import assert_that
-from aseafile_tests.config import BASE_DIR
-from aseafile.models import FileItemDetail, SmartLink, UploadedFileItem
-from aseafile_tests.test_data.context import TestContext
+from tests.config import BASE_DIR
+from tests.test_data.context import TestContext
+from src.aseafile.models import FileItemDetail, SmartLink, UploadedFileItem
 
 
 @pytest.mark.incremental

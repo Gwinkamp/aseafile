@@ -1,5 +1,5 @@
-from aseafile_tests.config import SETTINGS
-from aseafile_tests.test_data.context import TestContext
+from tests.config import SETTINGS
+from tests.test_data.context import TestContext
 
 
 SCENARIOS = [

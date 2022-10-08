@@ -35,8 +35,8 @@ services:
   tests:
     build:
       context: ../
-      dockerfile: ./aseafile_tests/Dockerfile
-    command: sh aseafile_tests/wait_for_aseafile.sh  "python -m pytest"
+      dockerfile: ./tests/Dockerfile
+    command: sh tests/wait_for_aseafile.sh  "python -m pytest"
     environment:
       - BASE_URL=http://seafile.example.com
       - EMAIL=test@example.com

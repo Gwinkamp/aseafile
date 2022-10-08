@@ -3,9 +3,9 @@ import asyncio
 from config import SETTINGS
 from assertpy import add_extension
 from collections import defaultdict
-from aseafile import SeafileHttpClient
-from aseafile.models import SeaResult, RepoItem
-from aseafile_tests.test_logic.custom_assertions import contains_item
+from src.aseafile import SeafileHttpClient
+from src.aseafile.models import SeaResult, RepoItem
+from tests.test_logic.custom_assertions import contains_item
 
 
 @pytest.fixture(scope='session')

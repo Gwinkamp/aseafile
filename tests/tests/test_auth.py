@@ -2,13 +2,13 @@ import pytest
 from http import HTTPStatus
 from pydantic import HttpUrl
 from assertpy import assert_that
-from aseafile import SeafileHttpClient
-from aseafile.models import TokenContainer
-from aseafile_tests.config import SETTINGS
-from aseafile_tests.test_data.context import TestContext
+from src.aseafile import SeafileHttpClient
+from src.aseafile.models import TokenContainer
+from tests.config import SETTINGS
+from tests.test_data.context import TestContext
 
 # Scenarios
-from aseafile_tests.test_data.scenarios import FAILED_OBTAIN_AUTH_TOKEN_SCENARIOS
+from tests.test_data.scenarios import FAILED_OBTAIN_AUTH_TOKEN_SCENARIOS
 
 
 @pytest.mark.incremental

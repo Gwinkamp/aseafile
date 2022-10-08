@@ -1,10 +1,10 @@
 import aiohttp
 from typing import Dict, List, BinaryIO, Any
 from urllib.parse import urljoin
-from aseafile.route_storage import RouteStorage
-from aseafile.http_handlers import HttpRequestHandler, HttpDownloadHandler
-from aseafile.models import *
-from aseafile.enums import *
+from .enums import *
+from .models import *
+from .route_storage import RouteStorage
+from .http_handlers import HttpRequestHandler, HttpDownloadHandler
 
 
 class SeafileHttpClient:

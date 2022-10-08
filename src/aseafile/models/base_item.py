@@ -1,4 +1,4 @@
-from aseafile.enums import ItemType
+from ..enums import ItemType
 from pydantic import BaseModel
 
 
