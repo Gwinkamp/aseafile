@@ -1,4 +1,6 @@
 class RouteStorage:
+    """Route storage for storing, processing and giving routes of seafile web api"""
+
     DEFAULT_SUFFIX = 'api2/'
 
     PING_ROUTE = 'ping/'

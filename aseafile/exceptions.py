@@ -1,4 +1,6 @@
 class UnauthorizedError(Exception):
+    """Custom exception that is raised when a token obtained error occurs"""
+
     def __init__(self, *args: object):
         super().__init__(*args)
 

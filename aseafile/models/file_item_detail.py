@@ -3,6 +3,7 @@ from .base_item import BaseItem
 
 
 class FileItemDetail(BaseItem):
+    """Model with detail information about the seafile file"""
     size: int
     is_draft: bool
     has_draft: bool

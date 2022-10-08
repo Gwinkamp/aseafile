@@ -2,6 +2,7 @@ from .base_item import BaseItem
 
 
 class FileItem(BaseItem):
+    """Model with information about the seafile file"""
     size: int
     modifier_name: str
     modifier_email: str

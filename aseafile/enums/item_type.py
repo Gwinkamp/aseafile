@@ -2,6 +2,7 @@ from .base import StrEnum
 
 
 class ItemType(StrEnum):
-    REPO = 'repo'
+    """Enumeration of item types"""
     FILE = 'file'
-    DIR = 'dir'
+    REPOSITORY = 'repo'
+    DIRECTORY = 'dir'
