@@ -12,6 +12,7 @@ class RouteStorage:
     FILE_ROUTE = 'repos/{repo_id}/file/'
     SMART_LINK_ROUTE = 'smart-link/'
     GET_UPLOAD_LINK_ROUTE = 'repos/{repo_id}/upload-link/'
+    SEARCH_ROUTE = 'search-file/'
 
     def __init__(self, version: str = 'v2.1', suffix: str | None = None):
         self._version = version
@@ -40,6 +41,10 @@ class RouteStorage:
     @property
     def smart_link(self):
         return 'api/' + self._version + '/' + self.SMART_LINK_ROUTE
+
+    @property
+    def search_file(self):
+        return 'api/' + self._version + '/' + self.SEARCH_ROUTE
 
     def repo(self, repo_id: str):
         return self._suffix + self.REPO_ROUTE + repo_id + '/'

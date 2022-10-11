@@ -3,6 +3,7 @@ from typing import Dict, List, BinaryIO, Any
 from urllib.parse import urljoin
 from .enums import *
 from .models import *
+from .builders import QueryParams
 from .route_storage import RouteStorage
 from .http_handlers import HttpRequestHandler, HttpDownloadHandler
 
@@ -163,16 +164,15 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of RepoItem
         """
         method_url = urljoin(self.base_url, self._route_storage.repos)
-        query_params: Dict[str, str | int] | None = None
 
-        if repo_t is not None:
-            query_params = {'type': repo_t}
+        query_params = QueryParams()
+        query_params.add_param_if_exists('type', repo_t)
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[RepoItem])
@@ -245,13 +245,15 @@ class SeafileHttpClient:
         :returns: SeaResult object with upload link
         """
         method_url = urljoin(self.base_url, self._route_storage.get_upload_link(repo_id))
-        query_params: Dict[str, str | int] = {'p': dir_path}
+
+        query_params = QueryParams()
+        query_params.add_param('p', dir_path)
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=str)
@@ -280,14 +282,15 @@ class SeafileHttpClient:
         upload_ilnk_response = await self.get_upload_link(repo_id, dir_path)
 
         if not upload_ilnk_response.success:
-            SeaResult[UploadedFileItem](
+            return SeaResult[UploadedFileItem](
                 success=upload_ilnk_response.success,
                 status=upload_ilnk_response.status,
                 errors=upload_ilnk_response.errors,
                 content=None
             )
 
-        query_params: Dict[str, str | int] = {'ret-json': 1}
+        query_params = QueryParams()
+        query_params.add_param('ret-json', 1)
 
         data = aiohttp.FormData()
         data.add_field('file', payload, filename=filename)
@@ -301,7 +304,7 @@ class SeafileHttpClient:
             method=HttpMethod.POST,
             url=upload_ilnk_response.content,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -346,7 +349,8 @@ class SeafileHttpClient:
                 content=[]
             )
 
-        query_params: Dict[str, str | int] = {'ret-json': 1}
+        query_params = QueryParams()
+        query_params.add_param('ret-json', 1)
 
         data = aiohttp.FormData()
         data.add_field('parent_dir', dir_path)
@@ -361,7 +365,7 @@ class SeafileHttpClient:
             method=HttpMethod.POST,
             url=upload_ilnk_response.content,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -377,16 +381,16 @@ class SeafileHttpClient:
         :returns: SeaResult object with link to download file
         """
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
 
-        if reuse:
-            query_params['reuse'] = 1
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
+        query_params.add_param('reuse', int(reuse))
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=str)
@@ -424,13 +428,15 @@ class SeafileHttpClient:
         :returns: SeaResult object with FileItemDetail
         """
         method_url = urljoin(self.base_url, self._route_storage.file_detail(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
+
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=FileItemDetail)
@@ -443,7 +449,9 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
+
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.CREATE)
@@ -452,7 +460,7 @@ class SeafileHttpClient:
             method=HttpMethod.POST,
             url=method_url,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -467,7 +475,9 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
+
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.RENAME)
@@ -477,7 +487,7 @@ class SeafileHttpClient:
             method=HttpMethod.POST,
             url=method_url,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -500,7 +510,9 @@ class SeafileHttpClient:
         :returns: SeaResult object with a link to new file location
         """
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
+
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.MOVE)
@@ -511,7 +523,7 @@ class SeafileHttpClient:
             method=HttpMethod.POST,
             url=method_url,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -533,7 +545,9 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
+
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.COPY)
@@ -544,7 +558,7 @@ class SeafileHttpClient:
             method=HttpMethod.POST,
             url=method_url,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -558,7 +572,9 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.file(repo_id))
-        query_params: Dict[str, str | int] = {'p': filepath}
+
+        query_params = QueryParams()
+        query_params.add_param('p', filepath)
 
         data = aiohttp.FormData()
         data.add_field('operation', FileOperation.DELETE)
@@ -567,7 +583,7 @@ class SeafileHttpClient:
             method=HttpMethod.DELETE,
             url=method_url,
             token=token or self.token,
-            query_params=query_params,
+            query_params=query_params.get_result(),
             data=data
         )
 
@@ -626,13 +642,15 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of BaseItem
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {'p': path or '/'}
+
+        query_params = QueryParams()
+        query_params.add_param('p', path or '/')
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[BaseItem])
@@ -646,13 +664,15 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of BaseItem
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {'oid': dir_id}
+
+        query_params = QueryParams()
+        query_params.add_param('oid', dir_id)
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[BaseItem])
@@ -666,16 +686,16 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of FileItem
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {
-            'p': path or '/',
-            't': 'f'
-        }
+
+        query_params = QueryParams()
+        query_params.add_param('p', path or '/')
+        query_params.add_param('t', 'f')
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[FileItem])
@@ -689,16 +709,16 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of FileItem
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {
-            'oid': dir_id,
-            't': 'f'
-        }
+
+        query_params = QueryParams()
+        query_params.add_param('oid', dir_id)
+        query_params.add_param('t', 'f')
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[FileItem])
@@ -718,19 +738,17 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of DirectoryItem
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {
-            'p': path or '/',
-            't': 'd'
-        }
 
-        if recursive:
-            query_params['recursive'] = 1
+        query_params = QueryParams()
+        query_params.add_param('p', path or '/')
+        query_params.add_param('t', 'd')
+        query_params.add_param('recursive', int(recursive))
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[DirectoryItem])
@@ -750,19 +768,17 @@ class SeafileHttpClient:
         :returns: SeaResult object with list of DirectoryItem
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {
-            'oid': dir_id,
-            't': 'd'
-        }
 
-        if recursive:
-            query_params['recursive'] = 1
+        query_params = QueryParams()
+        query_params.add_param('oid', dir_id)
+        query_params.add_param('t', 'd')
+        query_params.add_param('recursive', int(recursive))
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=List[DirectoryItem])
@@ -779,13 +795,15 @@ class SeafileHttpClient:
             raise ValueError('Path should not be "/"')
 
         method_url = urljoin(self.base_url, self._route_storage.dir_detail(repo_id))
-        query_params: Dict[str, str | int] = {'path': path}
+
+        query_params = QueryParams()
+        query_params.add_param('path', path)
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=DirectoryItemDetail)
@@ -798,7 +816,9 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {'p': path}
+
+        query_params = QueryParams()
+        query_params.add_param('p', path)
 
         data = aiohttp.FormData()
         data.add_field('operation', DirectoryOperation.CREATE)
@@ -808,7 +828,7 @@ class SeafileHttpClient:
             url=method_url,
             token=token or self.token,
             data=data,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute()
@@ -822,7 +842,9 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {'p': path}
+
+        query_params = QueryParams()
+        query_params.add_param('p', path)
 
         data = aiohttp.FormData()
         data.add_field('operation', DirectoryOperation.RENAME)
@@ -833,7 +855,7 @@ class SeafileHttpClient:
             url=method_url,
             token=token or self.token,
             data=data,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute()
@@ -846,13 +868,15 @@ class SeafileHttpClient:
         :param token: access token
         """
         method_url = urljoin(self.base_url, self._route_storage.dir(repo_id))
-        query_params: Dict[str, str | int] = {'p': path}
+
+        query_params = QueryParams()
+        query_params.add_param('p', path)
 
         handler = HttpRequestHandler(
             method=HttpMethod.DELETE,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute()
@@ -867,17 +891,56 @@ class SeafileHttpClient:
         :returns: SeaResult with smart-link
         """
         method_url = urljoin(self.base_url, self._route_storage.smart_link)
-        query_params: Dict[str, str | int] = {
-            'repo_id': repo_id,
-            'path': path,
-            'is_dir': str(is_dir).lower()
-        }
+
+        query_params = QueryParams()
+        query_params.add_param('repo_id', repo_id)
+        query_params.add_param('path', path)
+        query_params.add_param('is_dir', str(is_dir).lower())
 
         handler = HttpRequestHandler(
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params
+            query_params=query_params.get_result()
         )
 
         return await handler.execute(content_type=SmartLink)
+
+    async def search_file(
+            self,
+            query: str,
+            repo_id: str,
+            token: str | None = None
+    ):
+        """Search files in repositories
+
+        :param query: keyword for searching
+        :param repo_id: id of repository where search will be performed
+        :param token: access token
+        :returns: SeaResult with list of SearchResultItem
+        """
+        method_url = urljoin(self.base_url, self._route_storage.search_file)
+
+        query_params = QueryParams()
+        query_params.add_param('q', query)
+        query_params.add_param('repo_id', repo_id)
+
+        hanndler = HttpRequestHandler(
+            method=HttpMethod.GET,
+            url=method_url,
+            token=token or self.token,
+            query_params=query_params.get_result()
+        )
+
+        response = await hanndler.execute(content_type=SearchResult)
+        result = SeaResult[List[SearchResultItem]](
+            success=response.success,
+            status=response.status,
+            errors=response.errors,
+            content=None
+        )
+
+        if result.success and response.content is not None:
+            result.content = response.content.data
+
+        return result

@@ -1,1 +1,2 @@
 from .failed_obtain_auth_token_and_ping import SCENARIOS as FAILED_OBTAIN_AUTH_TOKEN_SCENARIOS
+from .search_files_scenario import TEST_FILES

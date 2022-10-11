@@ -181,7 +181,7 @@ class TestUploadAndDownloadFiles:
         self.context.add('dirpath', '/')
         self.context.add('file_0', 'uploaded.md')
         self.context.add('file_1', 'test_file_1.txt')
-        self.context.add('file_2', 'test_file_2.txt')
+        self.context.add('file_2', 'test_file_2.md')
         self.context.add('file_3', 'test_file_3.txt')
         self.context.add('local_test_files_dir', BASE_DIR / 'test_data' / 'files')
 
