@@ -253,7 +253,7 @@ class SeafileHttpClient:
             method=HttpMethod.GET,
             url=method_url,
             token=token or self.token,
-            query_params=query_params.get_result()
+            query_params=query_params.get_result(),
         )
 
         return await handler.execute(content_type=str)
@@ -279,7 +279,7 @@ class SeafileHttpClient:
         :param token: access token
         :returns: SeaResult object with UploadedFileItem
         """
-        upload_ilnk_response = await self.get_upload_link(repo_id, dir_path)
+        upload_ilnk_response = await self.get_upload_link(repo_id, dir_path, token)
 
         if not upload_ilnk_response.success:
             return SeaResult[UploadedFileItem](
@@ -339,7 +339,7 @@ class SeafileHttpClient:
         :param token: access token
         :returns: SeaResult object with list of UploadedFileItem
         """
-        upload_ilnk_response = await self.get_upload_link(repo_id, dir_path)
+        upload_ilnk_response = await self.get_upload_link(repo_id, dir_path, token)
 
         if not upload_ilnk_response.success:
             SeaResult[List[UploadedFileItem]](
@@ -412,12 +412,13 @@ class SeafileHttpClient:
                 content=None
             )
 
-        handdler = HttpDownloadHandler(
+        handler = HttpDownloadHandler(
             method=HttpMethod.GET,
-            url=response.content
+            url=response.content,
+            token=token or self.token
         )
 
-        return await handdler.execute()
+        return await handler.execute()
 
     async def get_file_detail(self, repo_id: str, filepath: str, token: str | None = None):
         """Get detail information about the file

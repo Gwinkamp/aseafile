@@ -25,7 +25,7 @@ class TestSearchFiles:
         await self.upload_test_files(test_repo, authorized_http_client)
 
         # Act
-        result = await authorized_http_client.search_file('file_1', test_repo)
+        result = await authorized_http_client.search_file('searching', test_repo)
 
         # Assert
         assert_that(result).is_not_none()
@@ -33,7 +33,7 @@ class TestSearchFiles:
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
         assert_that(result.errors).is_none()
         assert_that(result.content).is_not_none().is_length(1)
-        assert_that(result.content).contains_item(lambda item: 'file_1' in item.path)
+        assert_that(result.content).contains_item(lambda item: 'searching' in item.path)
 
     @pytest.mark.asyncio
     async def test_search_file_by_extension(self, test_repo, authorized_http_client):
@@ -45,7 +45,7 @@ class TestSearchFiles:
         assert_that(result.success).is_true()
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
         assert_that(result.errors).is_none()
-        assert_that(result.content).is_not_none().is_length(1)
+        assert_that(result.content).is_not_none()
         assert_that(result.content).contains_item(lambda item: 'md' in item.path)
 
     @pytest.mark.asyncio
@@ -58,5 +58,5 @@ class TestSearchFiles:
         assert_that(result.success).is_true()
         assert_that(result.status).is_equal_to(HTTPStatus.OK)
         assert_that(result.errors).is_none()
-        assert_that(result.content).is_not_none().is_length(3)
+        assert_that(result.content).is_not_none()
         assert_that(result.content).contains_item(lambda item: 'file' in item.path)

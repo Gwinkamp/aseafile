@@ -4,6 +4,10 @@ TEST_DATA_DIR = BASE_DIR / 'test_data' / 'files'
 
 TEST_FILES = [
     {
+        'name': 'file_for_searching.txt',
+        'path': TEST_DATA_DIR / 'file_for_searching.txt'
+    },
+    {
         'name': 'test_file_1.txt',
         'path': TEST_DATA_DIR / 'test_file_1.txt'
     },
